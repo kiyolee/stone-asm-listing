@@ -1,4 +1,4 @@
-# stone-asm-listing
+# stone-disasm-listing
 
 STONE virus disassembly listing.
 
